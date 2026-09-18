@@ -7,18 +7,18 @@ export async function createSupabaseServerClient() {
   if (!url || !anonKey) {
     throw new Error("Supabase is not configured.");
   }
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createServerClient(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet: any) {
+      setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach( (c: any) => cookieStore.set(c.name, c.value, c.options));
-        } catch {
-          // Server Components cannot always mutate cookies; middleware refreshes the session.
-        }
+          cookiesToSet.forEach(({ name, value, options }) => 
+            cookieStore.set(name, value, options)
+          );
+        } catch {}
       },
     },
   });
