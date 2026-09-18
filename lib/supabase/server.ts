@@ -15,7 +15,7 @@ export async function createSupabaseServerClient() {
       },
       setAll(cookiesToSet: any) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          cookiesToSet.forEach( (c: any) => cookieStore.set(c.name, c.value, c.options));
         } catch {
           // Server Components cannot always mutate cookies; middleware refreshes the session.
         }
