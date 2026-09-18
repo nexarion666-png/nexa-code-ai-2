@@ -49,7 +49,7 @@ export function beginGitHubOAuth() {
 
   const state = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   localStorage.setItem(GITHUB_STATE_KEY, state);
-  const redirectUri = process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI || `${window.location.origin}/github/callback`;
+  const redirectUri = `https://nexa-code-ai-2.vercel.app/github/callback`;
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,

@@ -21,7 +21,7 @@ export default function GitHubCallbackPage() {
         return;
       }
       try {
-        const redirectUri = (typeof window !== "undefined" ? process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI : "") || `${window.location.origin}/github/callback`;
+        const redirectUri = `https://nexa-code-ai-2.vercel.app/github/callback`;
         const response = await fetch("/api/github/oauth/token", {
           method: "POST",
           headers: { "content-type": "application/json" },
