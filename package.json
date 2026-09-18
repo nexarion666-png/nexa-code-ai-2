@@ -1,0 +1,39 @@
+{
+  "name": "nexa-code-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^0.0.52",
+    "@ai-sdk/openai": "^0.0.66",
+    "@monaco-editor/react": "^4.6.0",
+    "ai": "^3.4.33",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.468.0",
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.4",
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^4.5.5",
+    "@octokit/rest": "^21.1.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/ssr": "^0.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.15",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2"
+  }
+}
