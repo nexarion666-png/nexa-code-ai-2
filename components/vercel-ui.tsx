@@ -100,7 +100,7 @@ export function DeployModal({ chatId, files, onClose, onDeployed }: { chatId: st
       if (String(current.readyState).toUpperCase() !== "READY") throw new Error(`Deployment finished with state ${current.readyState || "UNKNOWN"}. Open View Logs for details.`);
       const url = deploymentUrl(current);
       const logs = deploymentLogsUrl(current);
-      saveDeployment(chatId, { id: current.id, name: current.name || projectName, url, inspectorUrl: current.inspectorUrl, state: current.readyState, createdAt: Date.now(), repo: mode === "github" ? repo : undefined, projectName, mode });
+      saveDeployment(chatId, { id: current.id, name: current.name || projectName, url, inspectorUrl: (current.inspectorUrl || url) as string, state: current.readyState, createdAt: Date.now(), repo: mode === "github" ? repo : undefined, projectName, mode } as any);
       setStatus("done"); setResult({ url, logs }); onDeployed();
     } catch (error) { setStatus("idle"); setMessage(error instanceof Error ? error.message : "Deployment failed."); }
   }
