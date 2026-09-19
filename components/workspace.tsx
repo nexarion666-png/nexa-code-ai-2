@@ -80,10 +80,10 @@ export function Workspace() {
               {activeId && <Chat key={activeId} chatId={activeId} mode={mode} onModeChange={setMode} onTitle={(title) => rename(activeId, title)} onAgentOutput={handleAgentOutput} onNextStep={(step) => { setMobileTab("chat"); if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("nca-next-step", { detail: step })); }}/>} 
             </div>
             <div className={`${mobileTab === "code" ? "flex" : "hidden lg:flex"} min-h-0 min-w-0 flex-1 border-l border-line lg:w-[46%] lg:flex-none`}>
-              <CodePanel chatId={activeId} files={files} activePath={activePath} onOpen={(path) => setActiveFile(activeId, path)} changes={changes} nextSteps={nextSteps} onNextStep={() => setMobileTab("chat")}/>
+              <CodePanel chatId={activeId} files={files} activePath={activePath} onOpen={(path: string) => setActiveFile(activeId, path)} changes={changes} nextSteps={nextSteps} onNextStep={() => setMobileTab("chat")}/>
             </div>
             <div className={`${mobileTab === "files" ? "flex" : "hidden lg:hidden"} min-h-0 min-w-0 flex-1`}>
-              <FileExplorer files={files} activePath={activePath} onOpen={(path) => { setActiveFile(activeId, path); setMobileTab("code"); }}/>
+              <FileExplorer files={files} activePath={activePath} onOpen={(path: string) => { setActiveFile(activeId, path); setMobileTab("code"); }}/>
             </div>
             <div className={`${mobileTab === "tools" ? "flex" : "hidden"} min-h-0 min-w-0 flex-1 lg:hidden`}><DeploymentHistory chatId={activeId}/></div>
           </div>
