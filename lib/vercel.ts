@@ -40,7 +40,8 @@ export function clearVercelToken() {
 export async function validateVercelToken(token = getVercelToken()): Promise<VercelUser> {
   if (!isBrowser()) throw new Error("Vercel is available in the browser only.");
   if (!token) throw new Error("Paste a Vercel Access Token first.");
-  const response = await fetch("https://api.vercel.com/v2/user", {
+  const response = await try { if (!repoId && typeof window !== "undefined") { const c = localStorage.getItem(`github_repo_id_${repo}`); if (c) repoId = parseInt(c); } } catch {}
+  fetch("https://api.vercel.com/v2/user", {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await response.json().catch(() => ({}));
