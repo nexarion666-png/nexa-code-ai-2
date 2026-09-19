@@ -1,50 +1,28 @@
 import { NextRequest } from "next/server";
 import { streamText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-
 export const maxDuration = 60;
-
-const PROMPT = `You are Nexa Code AI. Build WHOLE project as MULTIPLE JSON LINES.
-Each line: {"path":"relative/path","content":"FULL FILE CODE ESCAPED","action":"Created"}
-No markdown, no explanation outside JSON lines.`;
+const PROMPT = `You are Nexa Code AI. Build WHOLE project as JSON LINES. Each line: {"path":"...","content":"..."} No markdown.`;
 
 export async function POST(req: NextRequest) {
-  try {
-    const { messages, apiKeys, apiKey } = await req.json();
-    const geminiKey = apiKeys?.gemini || apiKey;
-    const openrouterKey = apiKeys?.openrouter;
+  const { messages, apiKeys } = await req.json();
+  const keys = [apiKeys?.gemini, apiKeys?.gemini2, apiKeys?.gemini3].filter(Boolean);
+  if (!keys.length) return new Response(JSON.stringify({error:"No Gemini key"}),{status:400});
 
-    if (!geminiKey && !openrouterKey) {
-      return new Response(JSON.stringify({ error: "No API keys connected. Go to Settings." }), { status: 400 });
-    }
+  // Try stable models with 1500 RPD free, not preview 20 RPD
+  const modelsToTry = ["gemini-2.5-flash", "gemini-3-flash", "gemini-2.0-flash"];
 
-    let result;
-
-    // 1. Try Gemini first as you wanted
-    if (geminiKey) {
+  for (const key of keys) {
+    for (const modelName of modelsToTry) {
       try {
-        const google = createGoogleGenerativeAI({ apiKey: geminiKey });
-        const model = google("gemini-2.0-flash" as any);
-        result = await streamText({ model, system: PROMPT, messages });
-      } catch (err: any) {
-        console.log("Gemini failed:", err.message);
-        if (!openrouterKey) throw err;
+        const google = createGoogleGenerativeAI({ apiKey: key });
+        const result = await streamText({ model: google(modelName as any), system: PROMPT, messages, maxTokens: 32000 });
+        return result.toDataStreamResponse();
+      } catch (e:any) {
+        if (e.message?.includes("quota") || e.message?.includes("429")) continue;
+        throw e;
       }
     }
-
-    // 2. Fallback to OpenRouter (this will work for your quota issue)
-    if (!result && openrouterKey) {
-      const openrouter = createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: openrouterKey });
-      const model = openrouter("google/gemini-2.0-flash-001");
-      result = await streamText({ model, system: PROMPT, messages });
-    }
-
-    if (!result) throw new Error("No model available");
-
-    return result.toDataStreamResponse();
-  } catch (e: any) {
-    console.error("CHAT API ERROR:", e);
-    return new Response(JSON.stringify({ error: e.message || "AI request failed", details: String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
+  return new Response(JSON.stringify({error:"All free quotas hit. Wait 1 min or add 2nd free Gemini key in Settings."}),{status:429});
 }
