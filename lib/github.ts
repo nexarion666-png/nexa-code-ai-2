@@ -121,28 +121,38 @@ export async function pushFilesToGitHub(repo: GitHubRepo, files: Array<{ path: s
   if (!files.length) throw new Error("There are no files to push.");
   const client = await octokit();
   let pushed = 0;
-
-  for (const file of files) {
-    let sha: string | undefined;
+  let branch = repo.default_branch;
+  if (!branch) {
     try {
-      const existing = await client.rest.repos.getContent({ owner: repo.full_name.split("/")[0], repo: repo.name, path: file.path, ref: repo.default_branch });
-      if (!Array.isArray(existing.data) && existing.data.type === "file") sha = existing.data.sha;
-    } catch (error: unknown) {
-      const status = (error as { status?: number })?.status;
-      if (status !== 404) throw error;
+      const { data } = await client.rest.repos.get({
+        owner: repo.full_name.split("/")[0],
+        repo: repo.name
+      });
+      branch = data.default_branch || "main";
+    } catch {
+      branch = "main";
     }
-
+  }
+  for (const file of files) {
+    const cleanPath = file.path.replace(/^\/+/, "").trim();
+    if (!cleanPath) continue;
+    const owner = repo.full_name.split("/")[0];
+    let sha;
+    try {
+      const existing = await client.rest.repos.getContent({
+        owner, repo: repo.name, path: cleanPath, ref: branch
+      });
+      if (!Array.isArray(existing.data) && existing.data.type === "file") sha = existing.data.sha;
+    } catch (error) {
+      const status = error.status;
+      if (status !== 404) console.warn("check failed", error.message);
+    }
     await client.rest.repos.createOrUpdateFileContents({
-      owner: repo.full_name.split("/")[0],
-      repo: repo.name,
-      path: file.path,
-      message: `${sha ? "Update" : "Create"} ${file.path}`,
-      content: utf8ToBase64(file.content),
-      branch: repo.default_branch,
-      ...(sha ? { sha } : {}),
+      owner, repo: repo.name, path: cleanPath,
+      message: (sha ? "Update " : "Create ") + cleanPath + " via Nexa",
+      content: utf8ToBase64(file.content), branch, ...(sha ? { sha } : {}),
     });
     pushed += 1;
   }
-
   return pushed;
 }
