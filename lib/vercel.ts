@@ -6,7 +6,7 @@ const LAST_REPO_KEY = "last_github_repo";
 function isBrowser() { return typeof window !== "undefined"; }
 
 export type VercelUser = { id: string; username: string; email?: string; };
-export type VercelDeployment = { id: string; url: string; name?: string; state?: string; createdAt?: number; source?: string; };
+export type VercelDeployment = { id: string; url: string; name?: string; projectName?: string; state?: string; createdAt?: any; source?: string; repo?: string; mode?: string; inspectorUrl?: string; [k:string]: any; };
 
 export function getVercelToken(): string | null {
   if (!isBrowser()) return null;
