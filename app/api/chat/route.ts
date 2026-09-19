@@ -35,10 +35,10 @@ export async function POST(req: NextRequest) {
     let model;
     if (finalProvider === "openrouter") {
       const openrouter = createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: finalApiKey });
-      model = openrouter("google/gemini-2.0-flash-001");
+      model = openrouter("google/gemini-2.5-flash-001");
     } else {
       const google = createGoogleGenerativeAI({ apiKey: finalApiKey });
-      model = google("gemini-2.0-flash");
+      model = google("gemini-2.5-flash");
     }
 
     const result = await streamText({
