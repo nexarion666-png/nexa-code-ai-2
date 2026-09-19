@@ -1,28 +1,32 @@
 import { NextRequest } from "next/server";
 import { streamText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 export const maxDuration = 60;
-const PROMPT = `You are Nexa Code AI. Build WHOLE project as JSON LINES. Each line: {"path":"...","content":"..."} No markdown.`;
+const PROMPT = `You are Nexa Code AI. Build WHOLE project as JSON LINES. {"path":"...","content":"..."} No markdown. One shot only.`;
 
 export async function POST(req: NextRequest) {
-  const { messages, apiKeys } = await req.json();
-  const keys = [apiKeys?.gemini, apiKeys?.gemini2, apiKeys?.gemini3].filter(Boolean);
-  if (!keys.length) return new Response(JSON.stringify({error:"No Gemini key"}),{status:400});
-
-  // Try stable models with 1500 RPD free, not preview 20 RPD
-  const modelsToTry = ["gemini-2.5-flash", "gemini-3-flash", "gemini-2.0-flash"];
-
-  for (const key of keys) {
-    for (const modelName of modelsToTry) {
+  try {
+    const { messages, apiKeys } = await req.json();
+    
+    // 1. Try OpenRouter FIRST - it still has 2.5-flash with 50 RPD free (better than Google's 20)
+    if (apiKeys?.openrouter) {
       try {
-        const google = createGoogleGenerativeAI({ apiKey: key });
-        const result = await streamText({ model: google(modelName as any), system: PROMPT, messages, maxTokens: 32000 });
+        const openrouter = createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: apiKeys.openrouter });
+        const result = await streamText({ model: openrouter("google/gemini-2.5-flash"), system: PROMPT, messages });
         return result.toDataStreamResponse();
-      } catch (e:any) {
-        if (e.message?.includes("quota") || e.message?.includes("429")) continue;
-        throw e;
-      }
+      } catch(e){ console.log("openrouter fail", e); }
     }
+
+    // 2. Fallback to Google's forced 3.6-flash - 20 RPD
+    if (apiKeys?.gemini) {
+      const google = createGoogleGenerativeAI({ apiKey: apiKeys.gemini });
+      const result = await streamText({ model: google("gemini-3.6-flash" as any), system: PROMPT, messages });
+      return result.toDataStreamResponse();
+    }
+
+    return new Response(JSON.stringify({error:"No keys"}),{status:400});
+  } catch(e:any){
+    return new Response(JSON.stringify({error:e.message}),{status:500});
   }
-  return new Response(JSON.stringify({error:"All free quotas hit. Wait 1 min or add 2nd free Gemini key in Settings."}),{status:429});
 }
