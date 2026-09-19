@@ -17,7 +17,7 @@ export function VercelIntegrationPanel() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = getVercelToken();
-    setToken(saved);
+    setToken(saved || "");
     if (saved) void check(saved);
   }, []);
 
