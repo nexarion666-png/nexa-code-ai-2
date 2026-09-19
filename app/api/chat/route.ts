@@ -2,42 +2,53 @@ import { NextRequest } from "next/server";
 import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-const PLANNER_PROMPT = `You are **Nexa Code AI Planner**, focused strictly on system architecture, execution roadmaps, and technical planning.
 
+const PLANNER_PROMPT = `You are Nexa Code AI Planner, focused strictly on system architecture, execution roadmaps, and technical planning.
 - Ask 3-5 clarifying questions if needed
 - Then output a structured FINAL PROPOSAL with: Overview, Tech Stack, Features, File Structure, Data Model, Roadmap
 - At the end ALWAYS add EXACTLY: "Type 'Approved. Build it now' or click Approve to build?"
 - Do NOT write code. Only plan.`;
-const AGENT_PROMPT = `You are Nexa Code AI. You HAVE file write access. NEVER say you cannot access files. You MUST output files as JSON: {"path":"app/page.tsx","content":"...full file...","action":"Updated"} with escaped newlines. Always full file. After files write Changes Applied: and Next Steps:`;
+
+const AGENT_PROMPT = `You are Nexa Code AI. You HAVE file write access. NEVER say you cannot access files.
+You MUST build the WHOLE project in ONE response as MULTIPLE JSON LINES.
+Each line is ONE file: {"path":"app/page.tsx","content":"...full file escaped...","action":"Updated"}
+- Output files ONE AFTER ANOTHER, no markdown, no code fences, just raw JSON lines
+- Keep each file FULL but compact (no huge comments)
+- Build order: lib/store.ts, components/ProductCard.tsx, components/CartDrawer.tsx, app/page.tsx
+- After all files write: Changes Applied: and Next Steps:
+`;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, mode, provider, apiKey, apiKeys, filesContent } = body as any;
+    const { messages, mode, provider, apiKey, apiKeys } = body as any;
     let finalApiKey = apiKey;
     let finalProvider = provider || "gemini";
     if (!finalApiKey && apiKeys) {
       if (apiKeys.gemini) { finalApiKey = apiKeys.gemini; finalProvider = "gemini"; }
       else if (apiKeys.openrouter) { finalApiKey = apiKeys.openrouter; finalProvider = "openrouter"; }
-      else if (apiKeys.groq) { finalApiKey = apiKeys.groq; finalProvider = "groq"; }
     }
-    if (!finalApiKey ||!messages?.length) {
-      return new Response(JSON.stringify({ error: "Connect an OpenRouter, Groq, or Gemini API key in Settings first. Then I can plan and build with your key." }), { status: 400 });
-    }
+    if (!finalApiKey) return new Response(JSON.stringify({ error: "No API key" }), { status: 400 });
+
+    const systemPrompt = mode === "planner" ? PLANNER_PROMPT : AGENT_PROMPT;
+    
     let model;
-    if (finalProvider === "gemini") {
-      const g = createGoogleGenerativeAI({ apiKey: finalApiKey });
-      model = g("gemini-3.6-flash");
-    } else if (finalProvider === "groq") {
-      const g = createOpenAI({ apiKey: finalApiKey, baseURL: "https://api.groq.com/openai/v1" });
-      model = g("llama-3.3-70b-versatile");
+    if (finalProvider === "openrouter") {
+      const openrouter = createOpenAI({ baseURL: "https://openrouter.ai/api/v1", apiKey: finalApiKey });
+      model = openrouter("google/gemini-2.0-flash-001");
     } else {
-      const o = createOpenAI({ apiKey: finalApiKey, baseURL: "https://openrouter.ai/api/v1" });
-      model = o("google/gemini-3.6-flash");
+      const google = createGoogleGenerativeAI({ apiKey: finalApiKey });
+      model = google("gemini-2.0-flash");
     }
-    const fileList = filesContent? Object.keys(filesContent).slice(0,50).join("\n") : "No files";
-    const lastIdx = messages.length - 1;
-    if (messages[lastIdx]?.role === "user") { messages[lastIdx].content += `\n\n[Project files: ${fileList}]`; }
-    const result = await streamText({ model, system: mode === "planner"? PLANNER_PROMPT : AGENT_PROMPT, messages, temperature: mode === "agent"? 0.2 : 0.7, maxTokens: 8192 });
+
+    const result = streamText({
+      model,
+      system: systemPrompt,
+      messages,
+      maxTokens: 32000,
+      temperature: 0.2,
+    });
+
     return result.toTextStreamResponse();
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
