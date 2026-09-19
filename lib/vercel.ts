@@ -56,11 +56,11 @@ export function saveDeployment(d: any) {
     localStorage.setItem(DEPLOYMENTS_KEY, JSON.stringify(all.slice(0,20)));
   } catch {}
 }
-export function getDeploymentHistory(): VercelDeployment[] {
+export function getDeploymentHistory(_chatId?: string): VercelDeployment[] {
   if (!isBrowser()) return [];
   try { return JSON.parse(localStorage.getItem(DEPLOYMENTS_KEY) || "[]"); } catch { return []; }
 }
-export const getDeployments = getDeploymentHistory;
+export const getDeployments = (chatId?: string) => getDeploymentHistory(chatId);
 
 export async function deployToVercel(opts: { token: string; repo: string; projectName: string; repoId?: number }) {
   let repoId: number | null = opts.repoId || null;
