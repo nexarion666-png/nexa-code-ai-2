@@ -1,107 +1,198 @@
-const TOKEN_KEY = "vercel_token";
-const LAST_PUSH_KEY = "last_github_push";
-const DEPLOYMENTS_KEY = "vercel_deployments";
-const LAST_REPO_KEY = "last_github_repo";
+"use client";
 
-function isBrowser() { return typeof window !== "undefined"; }
+export const VERCEL_TOKEN_KEY = "vercel_token";
+export const VERCEL_HISTORY_KEY = "nca-vercel-deployments-v1";
+export const VERCEL_PUSH_STATE_KEY = "nca-github-push-state-v1";
+export const GITHUB_REPO_ID_KEY_PREFIX = "github_repo_id_";
 
-export type VercelUser = { id: string; username: string; email?: string; };
-export type VercelDeployment = { id: string; url: string; name?: string; projectName?: string; state?: string; createdAt?: any; source?: string; repo?: string; mode?: string; inspectorUrl?: string; [k:string]: any; };
+export type VercelDeployment = {
+  id: string;
+  name: string;
+  url: string;
+  inspectorUrl?: string;
+  state?: string;
+  readyState?: string;
+  createdAt: number | string;
+  repo?: string;
+  projectName?: string;
+  mode?: "github" | "direct";
+  chatId?: string;
+  [k: string]: any;
+};
+
+export type VercelUser = { id: string; username?: string; email?: string; name?: string };
+
+function isBrowser() { return typeof window!== "undefined"; }
 
 export function getVercelToken(): string | null {
   if (!isBrowser()) return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(VERCEL_TOKEN_KEY);
 }
-export function saveVercelToken(token: string) {
+export function saveVercelToken(t: string) {
   if (!isBrowser()) return;
-  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(VERCEL_TOKEN_KEY, t);
 }
 export function clearVercelToken() {
   if (!isBrowser()) return;
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(VERCEL_TOKEN_KEY);
 }
-export async function validateVercelToken(token = getVercelToken()): Promise<VercelUser> {
-  if (!isBrowser()) throw new Error("Vercel is available in the browser only.");
-  if (!token) throw new Error("Paste a Vercel Access Token first.");
-  const response = await fetch("https://api.vercel.com/v2/user", {
+
+export async function validateVercelToken(token: string): Promise<VercelUser> {
+  const res = await fetch("https://api.vercel.com/v2/user", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.error?.message || "Invalid token");
-  return data?.user || data;
+  if (!res.ok) throw new Error("Invalid Vercel token");
+  const data = await res.json();
+  const u = data.user || data;
+  return { id: u.id, username: u.username, email: u.email, name: u.name };
 }
 
-export function getLastGitHubPush(chatId: string): any {
+// --- GitHub push state (used by vercel-ui.tsx) ---
+export function getLastGitHubPush(chatId: string): { repo: string; at: number } | null {
   if (!isBrowser()) return null;
-  try { return JSON.parse(localStorage.getItem(`${LAST_PUSH_KEY}_${chatId}`) || "null"); } catch { return null; }
-}
-export function saveLastGitHubPush(chatId: string, data: any) {
-  if (!isBrowser()) return;
-  localStorage.setItem(`${LAST_PUSH_KEY}_${chatId}`, JSON.stringify(data));
-  if (data?.repo || data?.fullName) {
-    localStorage.setItem(LAST_REPO_KEY, data.repo || data.fullName);
-  }
-}
-export const markGitHubPush = saveLastGitHubPush;
-export function getLastGitHubRepo(chatId: string) {
-  const d = getLastGitHubPush(chatId);
-  return d?.repo || d?.fullName || (isBrowser() ? localStorage.getItem(LAST_REPO_KEY) || "" : "");
+  try {
+    const raw = localStorage.getItem(VERCEL_PUSH_STATE_KEY) || localStorage.getItem("nca-github-push-state-v1") || "{}";
+    const map = JSON.parse(raw);
+    return map[chatId] || null;
+  } catch { return null; }
 }
 
-export function saveDeployment(d: any) {
+// --- Deployment History (chat-scoped) ---
+export function getDeploymentHistory(chatId?: string): VercelDeployment[] {
+  if (!isBrowser()) return [];
+  try {
+    const raw = localStorage.getItem(VERCEL_HISTORY_KEY) || "[]";
+    const all: VercelDeployment[] = JSON.parse(raw);
+    if (!chatId) return all;
+    return all.filter(d =>!d.chatId || d.chatId === chatId);
+  } catch { return []; }
+}
+
+export const getDeployments = getDeploymentHistory;
+
+export function saveDeployment(chatId: string, dep: VercelDeployment) {
   if (!isBrowser()) return;
   try {
-    const all = JSON.parse(localStorage.getItem(DEPLOYMENTS_KEY) || "[]");
-    all.unshift(d);
-    localStorage.setItem(DEPLOYMENTS_KEY, JSON.stringify(all.slice(0,20)));
+    const withChat = {...dep, chatId, createdAt: dep.createdAt || Date.now() };
+    const raw = localStorage.getItem(VERCEL_HISTORY_KEY) || "[]";
+    const all: VercelDeployment[] = JSON.parse(raw);
+    // dedupe by id
+    const filtered = all.filter(d => d.id!== dep.id);
+    const next = [withChat,...filtered].slice(0, 50);
+    localStorage.setItem(VERCEL_HISTORY_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event("nca-vercel-deployed"));
   } catch {}
 }
-export function getDeploymentHistory(_chatId?: string): VercelDeployment[] {
-  if (!isBrowser()) return [];
-  try { return JSON.parse(localStorage.getItem(DEPLOYMENTS_KEY) || "[]"); } catch { return []; }
+
+// legacy overload: saveDeployment(dep) without chatId (kept for compat)
+export function saveDeploymentLegacy(dep: any) {
+  if (!isBrowser()) return;
+  try {
+    const raw = localStorage.getItem(VERCEL_HISTORY_KEY) || "[]";
+    const all = JSON.parse(raw);
+    localStorage.setItem(VERCEL_HISTORY_KEY, JSON.stringify([dep,...all].slice(0, 50)));
+  } catch {}
 }
-export const getDeployments = (chatId?: string) => getDeploymentHistory(chatId);
 
-export async function deployToVercel(opts: { token: string; repo: string; projectName: string; repoId?: number }) {
-  let repoId: number | null = opts.repoId || null;
+// --- Helpers for URLs ---
+export function deploymentUrl(d: any): string {
+  const url = d?.url || "";
+  if (!url) return "";
+  return url.startsWith("http")? url : `https://${url}`;
+}
+export function deploymentLogsUrl(d: any): string {
+  return d?.inspectorUrl || d?.url? (d.inspectorUrl?.startsWith("http")? d.inspectorUrl : deploymentUrl(d)) : `https://vercel.com/dashboard`;
+}
 
-  if (!repoId && isBrowser()) {
-    try {
-      const cached = localStorage.getItem(`github_repo_id_${opts.repo}`);
-      if (cached) repoId = parseInt(cached);
-    } catch {}
-    if (!repoId) {
-      try {
-        const ghToken = localStorage.getItem("github_token") || localStorage.getItem("gh_token") || "";
-        if (ghToken && opts.repo) {
-          const r = await fetch(`https://api.github.com/repos/${opts.repo}`, {
-            headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" },
-          });
-          if (r.ok) {
-            const d = await r.json();
-            if (d?.id) {
-              repoId = d.id;
-              localStorage.setItem(`github_repo_id_${opts.repo}`, String(d.id));
-            }
-          }
-        }
-      } catch {}
+// --- Core Vercel API ---
+function headers() {
+  const t = getVercelToken();
+  if (!t) throw new Error("Connect Vercel first in Settings");
+  return { Authorization: `Bearer ${t}`, "Content-Type": "application/json" };
+}
+
+export async function createVercelDeployment(opts: {
+  projectName: string;
+  repo?: string;
+  ref?: string;
+  environment?: string[];
+  files?: { path: string; content: string }[];
+}): Promise<any> {
+  const h = headers();
+
+  // Resolve repoId if deploying from GitHub (this fixes your Failed to fetch)
+  let repoId: number | undefined;
+  if (opts.repo) {
+    if (isBrowser()) {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(GITHUB_REPO_ID_KEY_PREFIX) && k.endsWith(`_${opts.repo}`));
+      if (keys.length) {
+        const v = localStorage.getItem(keys[0]!);
+        if (v) repoId = Number(v);
+      }
     }
   }
 
-  if (!repoId) throw new Error(`repoId missing for ${opts.repo}. Push to GitHub again to cache it, then retry Deploy.`);
+  let body: any;
+  if (opts.repo) {
+    body = {
+      name: opts.projectName,
+      gitSource: {
+        type: "github",
+        repo: opts.repo,
+        ref: opts.ref || "main",
+       ...(repoId? { repoId } : {}),
+      },
+      projectSettings: { framework: "nextjs" },
+    };
+  } else {
+    const vercelFiles = (opts.files || []).map(f => ({
+      file: f.path.replace(/^\//, ""),
+      data: f.content,
+    }));
+    body = {
+      name: opts.projectName,
+      files: vercelFiles,
+      projectSettings: { framework: "nextjs" },
+    };
+  }
+
+  // env
+  if (opts.environment?.length) {
+    const env: any = {};
+    for (const line of opts.environment) {
+      const idx = line.indexOf("=");
+      if (idx > 0) {
+        const k = line.slice(0, idx).trim();
+        const v = line.slice(idx + 1).trim();
+        if (k) env[k] = v;
+      }
+    }
+    if (Object.keys(env).length) body.env = env;
+  }
 
   const res = await fetch("https://api.vercel.com/v13/deployments", {
     method: "POST",
-    headers: { Authorization: `Bearer ${opts.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: opts.projectName.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-      gitSource: { type: "github", repoId: repoId, ref: "main", repo: opts.repo },
-      project: opts.projectName,
-    }),
+    headers: h as any,
+    body: JSON.stringify(body),
   });
-  const dep = await res.json();
-  if (!res.ok) throw new Error(dep?.error?.message || JSON.stringify(dep));
-  saveDeployment(dep);
-  return dep;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `Vercel deploy failed (${res.status})`);
+  return data;
+}
+
+export async function getVercelDeployment(id: string): Promise<any> {
+  const token = getVercelToken();
+  if (!token) throw new Error("Missing Vercel token");
+  const res = await fetch(`https://api.vercel.com/v13/deployments/${id}`, {
+    headers: { Authorization: `Bearer ${token}` } as any,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || "Could not fetch deployment");
+  return data;
+}
+
+// extra compat exports some files may use
+export async function deployToVercel(o: { token: string; repo: string; projectName: string; repoId?: number }) {
+  saveVercelToken(o.token);
+  return createVercelDeployment({ projectName: o.projectName, repo: o.repo });
 }
