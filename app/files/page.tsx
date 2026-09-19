@@ -40,8 +40,8 @@ export default function FilesPage() {
       </select>
     </header>
     <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-      <aside className="hidden w-[300px] shrink-0 border-r border-line lg:flex"><FileExplorer files={files} activePath={activePath} onOpen={(path) => setActiveFile(chatId, path)} /></aside>
-      <section className="flex min-h-0 flex-1"><CodePanel chatId={chatId} files={files} activePath={activePath} onOpen={(path) => setActiveFile(chatId, path)} changes={changes} nextSteps={nextSteps} onNextStep={() => { if (typeof window !== "undefined") window.location.href = "/"; }} /></section>
+      <aside className="hidden w-[300px] shrink-0 border-r border-line lg:flex"><FileExplorer files={files} activePath={activePath} onOpen={(path: string) => setActiveFile(chatId, path)} /></aside>
+      <section className="flex min-h-0 flex-1"><CodePanel chatId={chatId} files={files} activePath={activePath} onOpen={(path: string) => setActiveFile(chatId, path)} changes={changes} nextSteps={nextSteps} onNextStep={() => { if (typeof window !== "undefined") window.location.href = "/"; }} /></section>
     </div>
   </main>;
 }
