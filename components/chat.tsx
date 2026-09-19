@@ -5,12 +5,13 @@ import Image from "next/image";
 import { ImagePlus, Paperclip, Send, Sparkles, CheckCircle2, X } from "lucide-react";
 import { ModeToggle, Mode } from "./mode-toggle";
 import { Button } from "./ui";
-import { getApiKey, Provider } from "@/lib/storage";
+import { getApiKey, Provider, readRaw } from "@/lib/storage";
+import { decryptSecret } from "@/lib/crypto";
 import { parseAgentFiles, parseAgentNotes } from "@/lib/agent-output";
 import { useFileStore } from "@/lib/fileStore";
 
 type Message = { role: "user" | "assistant"; content: string };
-const defaultProvider: Provider = "openrouter";
+const defaultProvider: Provider = "gemini";
 const MESSAGE_KEY = "nca-chat-messages-v1";
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -68,12 +69,12 @@ export function Chat({ chatId, mode, onModeChange, onTitle, onAgentOutput, onNex
   }, [messages, chatId]);
 
   async function requestAgent(buildContext: string, history: Message[]) {
-    const key = await getApiKey(defaultProvider);
+    const _raw = readRaw(); const _apiKeys: any = {}; for (const k of Object.keys(_raw)) { try { _apiKeys[k] = await decryptSecret(_raw[k as any]); } catch {} } const key = _apiKeys[defaultProvider] || _apiKeys.gemini || _apiKeys.openrouter || _apiKeys.groq || await getApiKey(defaultProvider); const apiKeys = _apiKeys;
     if (!key) { setMessages(prev => [...prev, { role: "assistant", content: "Connect an AI API key in Settings first. Then I can build with your key." }]); return; }
     const agentPrompt: Message = { role: "user", content: `Approved workflow. Build it now.\n\n${buildContext}` };
     const requestMessages = [...history, agentPrompt];
     setMessages(prev => [...prev, agentPrompt, { role: "assistant", content: "" }]);
-    const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: requestMessages, mode: "agent", provider: defaultProvider, apiKey: key }) });
+    const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: requestMessages, mode: "agent", provider: defaultProvider, apiKey: key, apiKeys }) });
     if (!res.ok || !res.body) { const data = await res.json().catch(() => ({})); throw new Error(data.error || "AI request failed."); }
     await consumeStream(res.body, true);
   }
@@ -90,10 +91,10 @@ export function Chat({ chatId, mode, onModeChange, onTitle, onAgentOutput, onNex
     if (selectedImage) addImage(chatId, { path: `inspiration/${Date.now()}-${selectedImage.name.replace(/[^a-zA-Z0-9._-]/g, "-")}.jpg`, content: selectedImage.dataUrl, mimeType: selectedImage.mimeType, size: selectedImage.size });
     setBusy(true);
     try {
-      const key = await getApiKey(defaultProvider);
+      const _raw = readRaw(); const _apiKeys: any = {}; for (const k of Object.keys(_raw)) { try { _apiKeys[k] = await decryptSecret(_raw[k as any]); } catch {} } const key = _apiKeys[defaultProvider] || _apiKeys.gemini || _apiKeys.openrouter || _apiKeys.groq || await getApiKey(defaultProvider); const apiKeys = _apiKeys;
       if (!key) { setMessages(prev => [...prev, { role: "assistant", content: "Connect an OpenRouter, Groq, or Gemini API key in Settings first. Then I can plan and build with your key." }]); return; }
       const apiMessages = selectedImage ? [...messages, { role: "user" as const, content: [{ type: "text", text: text || "Please use this image as design inspiration." }, { type: "image_url", image_url: selectedImage.dataUrl }] }] : next;
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: apiMessages, mode, provider: defaultProvider, apiKey: key }) });
+      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: apiMessages, mode, provider: defaultProvider, apiKey: key, apiKeys }) });
       if (!res.ok || !res.body) { const data = await res.json().catch(() => ({})); throw new Error(data.error || "AI request failed."); }
       await consumeStream(res.body, mode === "agent");
     } catch (e) { setMessages(prev => [...prev, { role: "assistant", content: `Error: ${e instanceof Error ? e.message : "Request failed."}` }]); }
