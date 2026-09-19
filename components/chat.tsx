@@ -72,7 +72,7 @@ export function Chat({ chatId, mode, onModeChange, onTitle, onAgentOutput, onNex
     const _raw: any = readRaw() as any; const _apiKeys: any = {}; for (const k of Object.keys(_raw)) { try { _apiKeys[k] = await decryptSecret(_raw[k]); } catch {} } const key = _apiKeys[defaultProvider] || _apiKeys.gemini || _apiKeys.openrouter || _apiKeys.groq || await getApiKey(defaultProvider); const apiKeys = _apiKeys;
     if (!key) { setMessages(prev => [...prev, { role: "assistant", content: "Connect an AI API key in Settings first. Then I can build with your key." }]); return; }
     const agentPrompt: Message = { role: "user", content: `Approved workflow. Build it now.\n\n${buildContext}` };
-    const requestMessages = [...history, agentPrompt];
+    const requestMessages = [...history, agentPrompt]; console.log("AGENT MODE FORCED");
     setMessages(prev => [...prev, agentPrompt, { role: "assistant", content: "" }]);
     const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: requestMessages, mode: "agent", provider: defaultProvider, apiKey: key, apiKeys }) });
     if (!res.ok || !res.body) { const data = await res.json().catch(() => ({})); throw new Error(data.error || "AI request failed."); }
