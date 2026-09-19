@@ -21,13 +21,13 @@ export async function POST(req: NextRequest) {
     let model;
     if (finalProvider === "gemini") {
       const g = createGoogleGenerativeAI({ apiKey: finalApiKey });
-      model = g("gemini-2.5-flash");
+      model = g("gemini-3.6-flash");
     } else if (finalProvider === "groq") {
       const g = createOpenAI({ apiKey: finalApiKey, baseURL: "https://api.groq.com/openai/v1" });
       model = g("llama-3.3-70b-versatile");
     } else {
       const o = createOpenAI({ apiKey: finalApiKey, baseURL: "https://openrouter.ai/api/v1" });
-      model = o("google/gemini-2.5-flash");
+      model = o("google/gemini-3.6-flash");
     }
     const fileList = filesContent? Object.keys(filesContent).slice(0,50).join("\n") : "No files";
     const lastIdx = messages.length - 1;
