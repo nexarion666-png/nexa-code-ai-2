@@ -196,3 +196,13 @@ export async function deployToVercel(o: { token: string; repo: string; projectNa
   saveVercelToken(o.token);
   return createVercelDeployment({ projectName: o.projectName, repo: o.repo });
 }
+
+export function markGitHubPush(chatId: string, repo: string) {
+  if (!isBrowser()) return;
+  try {
+    const raw = localStorage.getItem(VERCEL_PUSH_STATE_KEY) || "{}";
+    const map = JSON.parse(raw);
+    map[chatId] = { repo, at: Date.now() };
+    localStorage.setItem(VERCEL_PUSH_STATE_KEY, JSON.stringify(map));
+  } catch {}
+}
