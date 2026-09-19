@@ -21,18 +21,18 @@ export async function POST(req: NextRequest) {
     let model;
     if (finalProvider === "gemini") {
       const g = createGoogleGenerativeAI({ apiKey: finalApiKey });
-      model = g("gemini-2.0-flash");
+      model = g("gemini-2.5-flash");
     } else if (finalProvider === "groq") {
       const g = createOpenAI({ apiKey: finalApiKey, baseURL: "https://api.groq.com/openai/v1" });
       model = g("llama-3.3-70b-versatile");
     } else {
       const o = createOpenAI({ apiKey: finalApiKey, baseURL: "https://openrouter.ai/api/v1" });
-      model = o("google/gemini-2.0-flash-exp:free");
+      model = o("google/gemini-2.5-flash");
     }
     const fileList = filesContent? Object.keys(filesContent).slice(0,50).join("\n") : "No files";
     const lastIdx = messages.length - 1;
     if (messages[lastIdx]?.role === "user") { messages[lastIdx].content += `\n\n[Project files: ${fileList}]`; }
-    const result = await streamText({ model, system: mode === "planner"? PLANNER_PROMPT : AGENT_PROMPT, messages, temperature: mode === "agent"? 0.2 : 0.7, maxTokens: 4096 });
+    const result = await streamText({ model, system: mode === "planner"? PLANNER_PROMPT : AGENT_PROMPT, messages, temperature: mode === "agent"? 0.2 : 0.7, maxOutputTokens: 8192 });
     return result.toTextStreamResponse();
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
