@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const fileList = filesContent? Object.keys(filesContent).slice(0,50).join("\n") : "No files";
     const lastIdx = messages.length - 1;
     if (messages[lastIdx]?.role === "user") { messages[lastIdx].content += `\n\n[Project files: ${fileList}]`; }
-    const result = await streamText({ model, system: mode === "planner"? PLANNER_PROMPT : AGENT_PROMPT, messages, temperature: mode === "agent"? 0.2 : 0.7, maxOutputTokens: 8192 });
+    const result = await streamText({ model, system: mode === "planner"? PLANNER_PROMPT : AGENT_PROMPT, messages, temperature: mode === "agent"? 0.2 : 0.7, maxTokens: 8192 });
     return result.toTextStreamResponse();
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
